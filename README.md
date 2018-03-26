@@ -40,6 +40,8 @@ This framework runs on a loop:
 
 The framework will handle communication with Overview. In particular:
 
+* It polls for work at `POLL_URL`. Your Overview environment must set `POLL_URL`
+  for your container.
 * `/app/run` will retry if there is a connection error.
 * `/app/run` will never crash.
 * *TODO* `/app/run` will poll Overview to check if the task is canceled. It
