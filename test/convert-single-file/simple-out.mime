@@ -1,0 +1,13 @@
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.json
+
+42
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.blob
+
+bar
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=done
+
+
+--MIME-BOUNDARY--

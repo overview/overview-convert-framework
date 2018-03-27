@@ -1,0 +1,14 @@
+#!/bin/bash
+
+DIR="$(realpath "$(dirname "$0")")"
+
+set -e
+set -x
+
+docker build . --target=dev # and output messages
+IMAGE=$(docker build . -q --target=dev)
+
+docker run -it --rm \
+         -v "$DIR"/cmd:/go/src/app/cmd:ro \
+         -v "$DIR"/test:/go/src/app/test:ro \
+         "$IMAGE"
