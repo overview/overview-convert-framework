@@ -2,6 +2,7 @@
 .PHONY: all build bin/run
 
 test: build
+	test/run/suite.bats
 	test/convert-single-file/suite.bats
 
 all: build

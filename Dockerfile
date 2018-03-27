@@ -7,7 +7,7 @@ RUN set -x \
 WORKDIR /go/src/app
 COPY . .
 VOLUME cmd
-CMD [ "sh", "-c", "make; reflex -r '\\.(go|bats|json|mime)$' -- make" ]
+CMD [ "sh", "-c", "make; reflex -r '\\.(go|bats|sh|json|mime)$' -- make" ]
 
 
 FROM dev AS build

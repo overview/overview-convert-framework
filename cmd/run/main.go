@@ -15,16 +15,9 @@ import (
 
 type Task struct {
   Url string `json:url`
-}
-
-func prepareTempdir(tmpdir string) error {
-  err := os.RemoveAll(tmpdir)
-  if err != nil {
-    return err
+  Blob struct {
+    Url string `json:url`
   }
-
-  err = os.MkdirAll(tmpdir, 0755)
-  return err
 }
 
 func writeInputJson(tmpdir string, jsonBytes []byte) error {
@@ -52,29 +45,34 @@ func generateMimeBoundary() []byte {
   return ret
 }
 
-func runConvert(url string, tempdir string) error {
+func runConvert(task Task, jsonBytes []byte) {
   mimeBoundary := string(generateMimeBoundary())
 
-  args := make([]string, 1)
+  args := make([]string, 2)
   args[0] = mimeBoundary
+  args[1] = string(jsonBytes)
   cmd := exec.Cmd {
     Path: "/app/convert",
     Args: args,
-    Dir: tempdir,
+  }
+
+  stdin, err := cmd.StdinPipe()
+  if err != nil {
+    log.Fatalf("Could not open stdin from /app/convert: %s", err)
   }
 
   stderr, err := cmd.StderrPipe()
   if err != nil {
-    return err
+    log.Fatalf("Could not open stderr from /app/convert: %s", err)
   }
 
   stdout, err := cmd.StdoutPipe()
   if err != nil {
-    return err
+    log.Fatalf("Could not open stdout from /app/convert: %s", err)
   }
 
   if err := cmd.Start(); err != nil {
-    return err
+    log.Fatalf("Could not invoke /app/convert: %s", err)
   }
 
   // Pipe stderr to self
@@ -84,8 +82,23 @@ func runConvert(url string, tempdir string) error {
     }
   }()
 
+  // Pipe job to stdin
+  go func() {
+    resp, err := http.Get(task.Blob.Url)
+    if err != nil {
+      // TODO handle non-fatal errors: 404 -> return
+      log.Printf("GET %s: %s", task.Blob.Url, err)
+      stdin.Close()
+    }
+    defer resp.Body.Close()
+    if _, err := io.Copy(stdin, resp.Body); err != nil {
+      log.Printf("Failed to copy blob to stdin: %s")
+    }
+    stdin.Close()
+  }()
+
   // Pipe stdout to url
-  resp, err := http.Post(url, "multipart/form-data; boundary=\"" + mimeBoundary + "\"", stdout)
+  resp, err := http.Post(task.Url, "multipart/form-data; boundary=\"" + mimeBoundary + "\"", stdout)
   if err != nil {
     log.Printf("POST piping /app/convert output failed: %s", err)
   }
@@ -93,40 +106,26 @@ func runConvert(url string, tempdir string) error {
   resp.Body.Close()
 
   if err := cmd.Wait(); err != nil {
-    // /app/convert MUST exit with status code 0. Non-zero means framework is
-    // broken.
-    return err
+    log.Fatalf("/app/convert did not return with status code 0. That means it has a bug.")
   }
-
-  return nil
 }
 
-func tick(url string, tempdir string) error {
+func tick(url string) {
   resp, err := http.Get(url)
   if err != nil {
     // TODO handle non-fatal errors: 404 -> retry; non-response -> wait and retry
-    return err
+    log.Fatalf("Unhandled HTTP error: %s", err)
   }
   defer resp.Body.Close()
-
-  err = prepareTempdir(tempdir)
-  if err != nil {
-    return err
-  }
 
   jsonBytes, err := ioutil.ReadAll(resp.Body)
   var task Task
   jsonDecoder := json.NewDecoder(bytes.NewReader(jsonBytes))
   if err := jsonDecoder.Decode(&task); err != nil {
-    // Server gave us gibberish. That's a fatal error.
-    return err
+    log.Fatalf("Could not parse JSON task from Overview: %s", err)
   }
 
-  if err := writeInputJson(tempdir, jsonBytes); err != nil {
-    return err
-  }
-
-  return runConvert(url, tempdir)
+  runConvert(task, jsonBytes)
 }
 
 func main() {
@@ -135,12 +134,13 @@ func main() {
     panic("You must set POLL_URL before calling this program")
   }
 
-  dir := os.TempDir() + "/overview-convert-run"
   rand.Seed(time.Now().UnixNano())
 
-  for {
-    if err := tick(url, dir); err != nil {
-      panic(err)
+  if os.Args[1] == "just-one-tick" {
+    tick(url)
+  } else {
+    for {
+      tick(url)
     }
   }
 }
