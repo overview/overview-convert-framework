@@ -3,17 +3,6 @@
 TEST_DIR=/go/src/app/test/convert-single-file
 cmd=/go/src/app/bin/convert-single-file
 
-setup() {
-	[ -d /tmp/convert-single-file-test ] && rm -r /tmp/convert-file-single-test
-	mkdir /tmp/convert-file-single-test
-	pushd /tmp/convert-file-single-test
-}
-
-teardown() {
-	popd
-	rm -rf /tmp/convert-file-single-test
-}
-
 set_convert_script() {
 	[ -d /app ] || mkdir /app
 	echo '#!/bin/sh' > /app/do-convert-single-file
@@ -37,6 +26,13 @@ input_json() {
 @test "output 0.png+0.jpg+0.txt" {
 	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0.png; echo -n jpg > 0.jpg'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/complete-out.mime -
+}
+
+@test "delete files between invocations" {
+	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0.png; echo -n jpg > 0.jpg'
+	input_blob | $cmd MIME-BOUNDARY $(input_json) >/dev/null
+  set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob'
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/simple-out.mime -
 }
 
 @test "output error if input stream has wrong length" {

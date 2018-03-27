@@ -24,21 +24,31 @@ type Task struct {
   } `json:blob`
 }
 
-func downloadBlob(inputJson string, mimeBoundary string) {
+func prepareTempDir(tempDir string) {
+  if err := os.RemoveAll(tempDir); err != nil {
+    log.Fatalf("Failed to empty %s: %s", tempDir, err)
+  }
+
+  if err := os.MkdirAll(tempDir, 0755); err != nil {
+    log.Fatalf("Failed to create %s: %s", tempDir, err)
+  }
+}
+
+func writeInputBlob(inputJson string, tempDir string, mimeBoundary string) {
   var task Task
   if err := json.NewDecoder(strings.NewReader(inputJson)).Decode(&task); err != nil {
     log.Fatalf("Could not parse input JSON: %s", err)
   }
 
-  blobFile, err := os.OpenFile("input.blob", os.O_CREATE|os.O_WRONLY, 0644)
+  blobFile, err := os.OpenFile(tempDir + "/input.blob", os.O_CREATE|os.O_WRONLY, 0644)
   if err != nil {
-    log.Fatalf("Could not open input.blob for writing: %s", err)
+    log.Fatalf("Could not open %s/input.blob for writing: %s", tempDir, err)
   }
   defer blobFile.Close()
 
   nBytes, err := io.Copy(blobFile, os.Stdin)
   if err != nil {
-    log.Fatalf("Could not copy from stdin to input.blob: %s", err)
+    log.Fatalf("Could not copy from stdin to %s/input.blob: %s", tempDir, err)
   }
 
   if nBytes != task.Blob.NBytes {
@@ -79,8 +89,8 @@ func printDoneAndExit(mimeBoundary string) {
   os.Exit(0)
 }
 
-func printFileAsFragment(path string, mimeBoundary string) {
-  file, err := os.Open(path)
+func printFileAsFragment(tempDir string, path string, mimeBoundary string) {
+  file, err := os.Open(tempDir + "/" + path)
   if err != nil {
     printErrorAndExit("do-convert-single-file did not output " + path, mimeBoundary)
   }
@@ -96,15 +106,18 @@ func printFileAsFragment(path string, mimeBoundary string) {
   }
 }
 
-func printFileAsFragmentIfExists(path string, mimeBoundary string) {
-  if _, err := os.Stat(path); err == nil {
-    printFileAsFragment(path, mimeBoundary)
+func printFileAsFragmentIfExists(tempDir string, path string, mimeBoundary string) {
+  if _, err := os.Stat(tempDir + "/" + path); err == nil {
+    printFileAsFragment(tempDir, path, mimeBoundary)
   }
 }
 
-func runConvert(mimeBoundary string) {
+func runConvert(mimeBoundary string, tempDir string) {
   path := "/app/do-convert-single-file"
-  cmd := exec.Cmd { Path: path }
+  cmd := exec.Cmd {
+    Path: path,
+    Dir: tempDir,
+  }
 
   stderr, err := cmd.StderrPipe()
   if err != nil {
@@ -163,22 +176,24 @@ func runConvert(mimeBoundary string) {
 
   close(interrupt)
 
-  printFileAsFragment("0.json", mimeBoundary)
-  printFileAsFragment("0.blob", mimeBoundary)
-  printFileAsFragmentIfExists("0.jpg", mimeBoundary)
-  printFileAsFragmentIfExists("0.png", mimeBoundary)
-  printFileAsFragmentIfExists("0.txt", mimeBoundary)
+  printFileAsFragment(tempDir, "0.json", mimeBoundary)
+  printFileAsFragment(tempDir, "0.blob", mimeBoundary)
+  printFileAsFragmentIfExists(tempDir, "0.jpg", mimeBoundary)
+  printFileAsFragmentIfExists(tempDir, "0.png", mimeBoundary)
+  printFileAsFragmentIfExists(tempDir, "0.txt", mimeBoundary)
   printDoneAndExit(mimeBoundary)
 }
 
-func doConvert(mimeBoundary string, inputJson string) {
-  downloadBlob(inputJson, mimeBoundary)
-  runConvert(mimeBoundary)
+func doConvert(mimeBoundary string, inputJson string, tempDir string) {
+  prepareTempDir(tempDir)
+  writeInputBlob(inputJson, tempDir, mimeBoundary)
+  runConvert(mimeBoundary, tempDir)
 }
 
 func main() {
   mimeBoundary := os.Args[1]
   inputJson := os.Args[2]
+  tempDir := os.TempDir() + "/overview-convert-single-file"
 
-  doConvert(mimeBoundary, inputJson)
+  doConvert(mimeBoundary, inputJson, tempDir)
 }
