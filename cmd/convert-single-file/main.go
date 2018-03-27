@@ -8,8 +8,9 @@ import (
   "log"
   "os"
   "os/exec"
-  "net/http"
+  "os/signal"
   "regexp"
+  "strings"
   "syscall"
 )
 
@@ -18,37 +19,32 @@ var bytesProgressRegex = regexp.MustCompile("^b(\\d+)/(\\d+)$")
 var fractionProgressRegex = regexp.MustCompile("^0(?:.\\d+)?$")
 
 type Task struct {
-  Url string `json:url`
+  Blob struct {
+    NBytes int64 `json:nBytes`
+  } `json:blob`
 }
 
-func downloadBlob() error {
-  jsonFile, err := os.Open("input.json")
-  if err != nil {
-    return err
-  }
-  defer jsonFile.Close()
-
+func downloadBlob(inputJson string, mimeBoundary string) {
   var task Task
-  if err := json.NewDecoder(jsonFile).Decode(&task); err != nil {
-    return err
+  if err := json.NewDecoder(strings.NewReader(inputJson)).Decode(&task); err != nil {
+    log.Fatalf("Could not parse input JSON: %s", err)
   }
-
-  resp, err := http.Get(task.Url)
-  if err != nil {
-    // TODO handle 404 (race in which task was canceled); crash on other errors
-    return err
-  }
-  defer resp.Body.Close()
 
   blobFile, err := os.OpenFile("input.blob", os.O_CREATE|os.O_WRONLY, 0644)
   if err != nil {
-    return err
+    log.Fatalf("Could not open input.blob for writing: %s", err)
   }
-  if _, err := io.Copy(blobFile, resp.Body); err != nil {
-    return err
+  defer blobFile.Close()
+
+  nBytes, err := io.Copy(blobFile, os.Stdin)
+  if err != nil {
+    log.Fatalf("Could not copy from stdin to input.blob: %s", err)
   }
 
-  return nil
+  if nBytes != task.Blob.NBytes {
+    message := fmt.Sprintf("Input had wrong length: read %d bytes, but input JSON specified %d bytes", nBytes, task.Blob.NBytes)
+    printErrorAndExit(message, mimeBoundary)
+  }
 }
 
 func printFragment(name string, contents string, mimeBoundary string) {
@@ -100,6 +96,12 @@ func printFileAsFragment(path string, mimeBoundary string) {
   }
 }
 
+func printFileAsFragmentIfExists(path string, mimeBoundary string) {
+  if _, err := os.Stat(path); err == nil {
+    printFileAsFragment(path, mimeBoundary)
+  }
+}
+
 func runConvert(mimeBoundary string) {
   path := "/app/do-convert-single-file"
   cmd := exec.Cmd { Path: path }
@@ -115,7 +117,11 @@ func runConvert(mimeBoundary string) {
   }
 
   if err := cmd.Start(); err != nil {
-    log.Fatalf("Could not start %s: %s", path, err)
+    if os.IsNotExist(err) {
+      printErrorAndExit(path + " does not exist or is not executable", mimeBoundary)
+    } else {
+      log.Fatalf("Could not start %s: %s", path, err)
+    }
   }
 
   // Pipe stderr to self
@@ -133,6 +139,14 @@ func runConvert(mimeBoundary string) {
     }
   }()
 
+  interrupt := make(chan os.Signal, 1)
+  signal.Notify(interrupt, os.Interrupt)
+
+  go func() {
+    <-interrupt
+    cmd.Process.Kill()
+  }()
+
   if err := cmd.Wait(); err != nil {
     if exiterr, ok := err.(*exec.ExitError); ok {
       // Buggy program exited with nonzero.
@@ -147,21 +161,24 @@ func runConvert(mimeBoundary string) {
     }
   }
 
+  close(interrupt)
+
   printFileAsFragment("0.json", mimeBoundary)
   printFileAsFragment("0.blob", mimeBoundary)
+  printFileAsFragmentIfExists("0.jpg", mimeBoundary)
+  printFileAsFragmentIfExists("0.png", mimeBoundary)
+  printFileAsFragmentIfExists("0.txt", mimeBoundary)
   printDoneAndExit(mimeBoundary)
 }
 
-func doConvert(mimeBoundary string) {
-  if err := downloadBlob(); err != nil {
-    panic(err)
-  }
-
+func doConvert(mimeBoundary string, inputJson string) {
+  downloadBlob(inputJson, mimeBoundary)
   runConvert(mimeBoundary)
 }
 
 func main() {
   mimeBoundary := os.Args[1]
+  inputJson := os.Args[2]
 
-  doConvert(mimeBoundary)
+  doConvert(mimeBoundary, inputJson)
 }

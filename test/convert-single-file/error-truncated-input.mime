@@ -1,0 +1,5 @@
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=error
+
+Input had wrong length: read 3 bytes, but input JSON specified 4 bytes
+--MIME-BOUNDARY--

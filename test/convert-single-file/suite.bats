@@ -14,11 +14,6 @@ teardown() {
 	rm -rf /tmp/convert-file-single-test
 }
 
-serve_http() {
-	echo -e "$1" | nc -l -p 8080 >/dev/null &
-	sleep 0.3 # wait for nc to start listening
-}
-
 set_convert_script() {
 	[ -d /app ] || mkdir /app
 	echo '#!/bin/sh' > /app/do-convert-single-file
@@ -26,42 +21,49 @@ set_convert_script() {
 	chmod +x /app/do-convert-single-file
 }
 
-set_input_json() {
-	echo '{"url":"http://localhost:8080/anything"}' > input.json
+input_blob() {
+  echo -n 'blob'
 }
 
-@test "download input.blob" {
-	serve_http 'HTTP/1.1 200 OK\r\n\r\nblob'
-	set_input_json
-	run $cmd MIME-BOUNDARY
-	[ -f input.blob ]
-	[ "$(cat input.blob)" = 'blob' ]
+input_json() {
+  echo '{"blob":{"nBytes":4}}'
 }
 
 @test "output 0.json+0.blob+done" {
-	serve_http 'HTTP/1.1 200 OK\r\n\r\nblob'
-	set_input_json
 	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob'
-	$cmd MIME-BOUNDARY | diff -u "$TEST_DIR"/simple-out.mime -
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/simple-out.mime -
+}
+
+@test "output 0.png+0.jpg+0.txt" {
+	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0.png; echo -n jpg > 0.jpg'
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/complete-out.mime -
+}
+
+@test "output error if input stream has wrong length" {
+	echo -n 'a--' | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/error-truncated-input.mime -
+}
+
+@test "output error if /app/do-convert-single-file does not exist" {
+  rm -f /app/do-convert-single-file
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/error-no-code.mime -
 }
 
 @test "output error if 0.blob does not exist" {
-	serve_http 'HTTP/1.1 200 OK\r\n\r\nblob'
-	set_input_json
 	set_convert_script 'echo -n 42 > 0.json'
-	$cmd MIME-BOUNDARY | diff -u "$TEST_DIR"/error-no-blob.mime -
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/error-no-blob.mime -
 }
 
 @test "output error if script exits with nonzero status code" {
-	serve_http 'HTTP/1.1 200 OK\r\n\r\nblob'
-	set_input_json
 	set_convert_script 'echo -n 42 > 0.json; exit 127'
-	$cmd MIME-BOUNDARY | diff -u "$TEST_DIR"/error-bad-exit-code.mime -
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/error-bad-exit-code.mime -
 }
 
 @test "output progress and error events" {
-	serve_http 'HTTP/1.1 200 OK\r\n\r\nblob'
-	set_input_json
 	set_convert_script 'echo c1/5; echo b20/100; echo 0.523; echo foo'
-	$cmd MIME-BOUNDARY | diff -u "$TEST_DIR"/progress-and-error.mime -
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/progress-and-error.mime -
+}
+
+@test "output quickly on SIGINT" {
+	set_convert_script 'echo c1/5; kill -SIGINT $(grep PPid /proc/$$/status | cut -f2); sleep 1; echo bad-success > 0.json; echo bad-success > 0.blob'
+	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/cancel.mime -
 }

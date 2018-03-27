@@ -33,98 +33,93 @@ COPY --from=build /app/do-convert-single-file /app/do-convert-single-file
 
 This framework runs on a loop:
 
-1. Empty a temporary directory.
-1. Download a task from Overview and write it to `input.json` in the directory.
-1. Run `/app/convert input.json` within the directory. Pipe the results to
+1. Download a task from Overview as JSON.
+1. Open a stream to download the body of the input file.
+1. Stream the body to `/app/convert MIME-BOUNDARY JSON` and pipe the results to
    Overview.
 
-The framework will handle communication with Overview. In particular:
+`/app/run` handles all communication with Overview. In particular:
 
-* It polls for work at `POLL_URL`. Your Overview environment must set `POLL_URL`
-  for your container.
+* `/app/run` polls for tasks at `POLL_URL`. Overview's administrator must set
+  `POLL_URL` for your container.
 * `/app/run` will retry if there is a connection error.
 * `/app/run` will never crash.
 * *TODO* `/app/run` will poll Overview to check if the task is canceled. It
-  will notify `/app/convert` with `SIGUSR1` if the task is canceled.
+  will notify `/app/convert` with `SIGINT` if the task is canceled.
 
-# `/app/convert-*`
+# `/app/convert` -- a.k.a., `/app/convert-*`
 
-This framework provides a few convert strategies. Choose one strategy for your
-converter, and copy it to `/app/convert`.
+`/app/convert` is a program we provide, under a few different names. That is,
+when you create your program you'll choose one of the following implementations
+to copy into `/app/convert` in your image.
 
-`/app/convert` will be invoked by `/app/run`. It will do the following:
+From `/app/run`'s point of view, `/app/convert` will read the input stream
+and `JSON` command-line argument and produce a `multipart/form-data` output
+stream with MIME boundary `MIME-BOUNDARY` (in C lingo, `argv[1]`).
+`/app/convert` will never crash, and it will always output a data stream that
+Overview can handle.
 
-1. Optionally, download `input.blob` into `$CWD` (the temporary directory)
-1. Spawn `/app/do-convert-XXXXX ARGS...` -- that's your code!
-1. Translate your code's `stdout` output into a `multipart/form-data` stream,
-   which is what `/app/run` will pipe to Overview.
+Your code is invoked by `/app/convert`, following one of these strategies:
 
-`/app/convert` will manage your code in a few ways:
-
-* *TODO* It will handle `SIGUSR1`, either passing it to your code or killing
-  your code's process with `SIGKILL` (depending on which strategy you choose).
-* *TODO* It will send Overview an `error` message if your code finishes with a
-  non-zero return value. (A non-zero return value is _always_ an error in your
-  code. Sometime errors are hard to avoid, such as `out of memory`. The
-  framework will do something sensible with those.)
-
-Now, pick your strategy:
-
-## *TODO* `/app/convert-single-file`
+## `/app/convert-single-file`
 
 This version of `/app/convert` will:
 
-1. Download `input.blob`
-2. Run `/app/do-convert-single-file` (your code)
-3. Translate the `stdout` from your code into progress events or an error event
-4. When your code exits with status `0` and no error message, pipe
+1. Write standard input to `input.blob` in a temporary directory and verify it's
+   the correct size
+1. Run `/app/do-convert-single-file JSON` (*your code*) in the temporary
+   directory
+1. Translate the `stdout` from your code into progress events or an error event
+1. When your code exits with status `0` and no error message, pipe
    `output.json`, `output.blob` -- and if they exist, `output-thumbnail.jpg`,
    `output-thumbnail.png` and `output.txt` -- and a `done` event
 
 Special cases:
 
-* *TODO* Cancelation: if `/app/run` sends a `SIGUSR1` signal, kills your program
-  with `SIGKILL` and pipes a `"canceled"` `error` event.
-* *TODO* Error: if `/app/do-convert-single-file` exits with non-zero return
-  value, pipes an `error` event.
+* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program with
+  `SIGKILL`.
+* Error: if `/app/do-convert-single-file` exits with non-zero return value,
+  pipes an `error` event.
 
 **You must provide `/app/do-convert-single-file`**. The framework will invoke
-`/app/do-convert` with no arguments. Your program can read `input.json` and
-`input.blob` in the current working directory. Your program must:
+`/app/do-convert JSON`. Your program can read `input.blob` in the current
+working directory. Your program must:
 
 1. Write progress messages to `stdout`, newline-delimited, that look like:
     * `p1/2` -- "finished processing page 1 of 2"
     * `b102/412` -- "finished processing byte 102 of 412"
     * `0.324` -- "finished processing 32.4% of input"
     * `anything else at all` -- "ERROR: [the line of text]"
-2. Write `output.json`, `output.blob`, and optionally `output-thumbnail.jpg`,
+1. Write `output.json`, `output.blob`, and optionally `output-thumbnail.jpg`,
    `output-thumbnail.png` and/or `output.txt`.
-3. Exit with status code `0`. Any other exit code is an error in your code.
+1. Exit with status code `0`. Any other exit code is an error in your code.
 
 ## *TODO* `/app/convert-file-to-mime-multipart`
 
 This version of `/app/convert` will:
 
-1. Download `input.blob`
-2. Run `/app/do-convert-file-to-mime-multipart RANDOM-MIME-BOUNDARY` (your code)
-3. Pipe your program's `stdout` to Overview
+1. Write standard input to `input.blob` in a temporary directory and verify it's
+   the correct size
+1. Run `/app/do-convert-file-to-mime-multipart MIME-BOUNDARY JSON` (*your code*)
+   in the temporary directory
+1. Pipe your program's `stdout` to Overview
 
 Special cases:
 
-* *TODO* Cancelation: if `/app/run` sends a `SIGUSR1` signal, kills your program
-  with `SIGKILL`, finishes reading its `stdout`, and appends a `"canceled"`
-  `error` event unless your program's output ended with
-  `--RANDOM-MIME-BOUNDARY--`.
+* *TODO* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program
+  with `SIGKILL`.
 * *TODO* Error: if your program exits with non-zero return value, pipes an
   `error` event.
+* *TODO* Buggy code: emits an `error` event if your program does not produce a
+  `error` or `done` event or end with `--MIME-BOUNDARY--`.
 
 **You must provide `/app/do-convert-file-to-mime-multipart`**. The framework
-will invoke it with a `RANDOM-MIME-BOUNDARY` argument, which will match the
-regex `[a-fA-F0-9]{1,60}`. Your program can read `input.json` and `input.blob`
+will invoke it with `MIME-BOUNDARY` and `JSON` as arguments. `MIME-BOUNDARY`
+will match the regex `[a-fA-F0-9]{1,60}`. Your program can read `input.blob`
 in the current directory.
 
-Your program needn't write files. It must write valid `multipart/form-data`
-output to `stdout`. For instance:
+Your program may write files, but it doesn't need to. It must write valid
+`multipart/form-data` output to `stdout`. For instance:
 
 ```multipart/form-data
 --RANDOM-MIME-BOUNDARY\r\n
@@ -157,9 +152,32 @@ Rules:
 
 This version of `/app/convert` will:
 
-1. Run `/app/do-convert-stream-to-mime-multipart RANDOM-MIME-BOUNDARY` (your
-   code)
-2. Stream the input file from Overview to your program's `stdin` and and pipe
+1. Run `/app/do-convert-stream-to-mime-multipart MIME-BOUNDARY JSON` (*your
+   code*)
+1. Stream the input file from Overview to your program's `stdin` and and pipe
    your program's `stdout` to Overview
 
-Your code must follow the same rules as `do-convert-file-to-mime-multipart`.
+Essentially, this is a stripped-down version of
+`/app/convert-file-to-mime-multipart`. It doesn't provide a temporary directory.
+It does handle `SIGINT`, verify the return value is `0`, and append an `error`
+event if your stream does not end with `--MIME-BOUNDARY--`.
+
+## Roll your own
+
+Even more lightweight than `/app/convert-stream-to-mime-multipart` is to roll
+your own version of `/app/convert`. Beware, though:
+
+* Your own version of `/app/convert` must always output messages to Overview:
+  especially a `done` or `error` event. Without those events, Overview will
+  never finish processing the file: it will retry indefinitely.
+* Your own version of `/app/convert` must always exit successfully. The
+  trickiest case, in our experience, is handling "out of memory." If your
+  `/app/convert` does not exit successfully, Overview will retry indefinitely
+  and the file will never be processed.
+* Your own version of `/app/convert` should output helpful error messages, so
+  you can debug it easily.
+* Your own version of `/app/convert` should end quickly after receiving
+  `SIGUSR`, because Overview will ignore all further output.
+
+`/app/convert-stream-to-mime-multipart` is small and fast, and it solves these
+problems for you. You probably want it.
