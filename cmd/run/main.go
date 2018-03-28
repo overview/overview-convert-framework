@@ -7,31 +7,22 @@ import (
   "io/ioutil"
   "log"
   "math/rand"
+  "net"
   "net/http"
+  "net/url"
   "os"
   "os/exec"
+  "syscall"
   "time"
 )
+
+const retryTimeout = 10 * time.Second
 
 type Task struct {
   Url string `json:url`
   Blob struct {
     Url string `json:url`
   }
-}
-
-func writeInputJson(tmpdir string, jsonBytes []byte) error {
-  f, err := os.OpenFile("input.json", os.O_CREATE|os.O_WRONLY, 0644)
-  if err != nil {
-    return err
-  }
-  if _, err := f.Write(jsonBytes); err != nil {
-    return err
-  }
-  if err := f.Close(); err != nil {
-    return err
-  }
-  return nil
 }
 
 func generateMimeBoundary() []byte {
@@ -48,11 +39,13 @@ func generateMimeBoundary() []byte {
 func runConvert(task Task, jsonBytes []byte) {
   mimeBoundary := string(generateMimeBoundary())
 
-  args := make([]string, 2)
-  args[0] = mimeBoundary
-  args[1] = string(jsonBytes)
+  path := "/app/convert"
+  args := make([]string, 3)
+  args[0] = path
+  args[1] = mimeBoundary
+  args[2] = string(jsonBytes)
   cmd := exec.Cmd {
-    Path: "/app/convert",
+    Path: path,
     Args: args,
   }
 
@@ -86,9 +79,13 @@ func runConvert(task Task, jsonBytes []byte) {
   go func() {
     resp, err := http.Get(task.Blob.Url)
     if err != nil {
-      // TODO handle non-fatal errors: 404 -> return
+      if resp.StatusCode != 200 {
+        // TODO handle non-fatal errors: 404 -> return
+        log.Fatalf("Overview gave us a task but no blob: %s", task.Blob.Url)
+      }
       log.Printf("GET %s: %s", task.Blob.Url, err)
       stdin.Close()
+      return
     }
     defer resp.Body.Close()
     if _, err := io.Copy(stdin, resp.Body); err != nil {
@@ -103,6 +100,7 @@ func runConvert(task Task, jsonBytes []byte) {
     log.Printf("POST piping /app/convert output failed: %s", err)
   }
   // TODO assert HTTP 202 Accepted
+  // TODO handle server going away
   resp.Body.Close()
 
   if err := cmd.Wait(); err != nil {
@@ -110,15 +108,37 @@ func runConvert(task Task, jsonBytes []byte) {
   }
 }
 
-func tick(url string) {
-  resp, err := http.Get(url)
+func tick(pollUrl string, retryTimeout time.Duration) {
+  resp, err := http.Get(pollUrl)
   if err != nil {
-    // TODO handle non-fatal errors: 404 -> retry; non-response -> wait and retry
-    log.Fatalf("Unhandled HTTP error: %s", err)
+    if uerr, ok := err.(*url.Error); ok {
+      if operr, ok := uerr.Err.(*net.OpError); ok {
+        if scerr, ok := operr.Err.(*os.SyscallError); ok {
+          if scerr.Err == syscall.ECONNREFUSED {
+            log.Printf("Connection refused; will retry in %fs", retryTimeout)
+            time.Sleep(retryTimeout)
+            return
+          }
+        }
+      }
+    }
+
+    log.Fatalf("Unhandled HTTP error: %#v", err)
   }
   defer resp.Body.Close()
+  if resp.StatusCode == 204 {
+    log.Printf("Overview has no tasks for us; will retry in %fs", retryTimeout)
+    time.Sleep(retryTimeout)
+    return
+  } else if resp.StatusCode != 200 {
+    log.Fatalf("Overview responded with status %s", resp.Status)
+  }
 
   jsonBytes, err := ioutil.ReadAll(resp.Body)
+  if err != nil {
+    log.Fatalf("Could not receive JSON task from Overview: %s", err)
+  }
+
   var task Task
   jsonDecoder := json.NewDecoder(bytes.NewReader(jsonBytes))
   if err := jsonDecoder.Decode(&task); err != nil {
@@ -129,18 +149,18 @@ func tick(url string) {
 }
 
 func main() {
-  url := os.Getenv("POLL_URL")
-  if url == "" {
+  pollUrl := os.Getenv("POLL_URL")
+  if pollUrl == "" {
     panic("You must set POLL_URL before calling this program")
   }
 
   rand.Seed(time.Now().UnixNano())
 
   if os.Args[1] == "just-one-tick" {
-    tick(url)
+    tick(pollUrl, 0 * time.Second)
   } else {
     for {
-      tick(url)
+      tick(pollUrl, retryTimeout)
     }
   }
 }
