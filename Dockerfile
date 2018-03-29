@@ -13,7 +13,8 @@ CMD [ "sh", "-c", "make; reflex -r '\\.(go|bats|sh|json|mime)$' -- make" ]
 FROM dev AS build
 RUN set -x \
       && make \
-      && mkdir /app \
+      && rm -rf /app \
+      && mkdir -p /app \
       && cp -av ./bin/* /app/
 
 
