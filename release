@@ -35,9 +35,8 @@ if [ $MAJOR_VERSION_INT -eq $OLD_MAJOR_VERSION_INT ] && [ $MINOR_VERSION_INT -eq
 
 (cd "$DIR" \
   && docker build . \
-  && echo "$PATCH_VERSION" > "$DIR"/VERSION \
-  && git add VERSION \
-  && git commit -m "v$PATCH_VERSION" \
+  && echo "$PATCH_VERSION" > VERSION \
+  && (git diff --quiet || git commit -m "v$PATCH_VERSION" VERSION) \
   && git push \
   && git tag "v$PATCH_VERSION" \
   && git push origin "v$PATCH_VERSION"
