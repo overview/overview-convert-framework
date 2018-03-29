@@ -144,12 +144,15 @@ func runConvert(mimeBoundary string, tempDir string) {
     }
   }()
 
+  doneWithStdout := make(chan interface{}, 1)
+
   // Convert stdout while piping
   go func() {
     scanner := bufio.NewScanner(stdout)
     for scanner.Scan() {
       printLineAsFragment(scanner.Text(), mimeBoundary)
     }
+    close(doneWithStdout)
   }()
 
   interrupt := make(chan os.Signal, 1)
@@ -160,7 +163,9 @@ func runConvert(mimeBoundary string, tempDir string) {
     cmd.Process.Kill()
   }()
 
-  if err := cmd.Wait(); err != nil {
+  err = cmd.Wait()
+  <-doneWithStdout
+  if err != nil {
     if exiterr, ok := err.(*exec.ExitError); ok {
       // Buggy program exited with nonzero.
       if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
