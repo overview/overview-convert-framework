@@ -129,6 +129,17 @@ func runConvert(mimeBoundary string, tempDir string) {
     log.Fatalf("Could not open stdout for read: %s", err)
   }
 
+  started := make(chan interface{}, 1)
+  interrupt := make(chan os.Signal, 1)
+  signal.Notify(interrupt, os.Interrupt)
+  go func() {
+    <-started
+    <-interrupt
+    cmd.Process.Kill()
+    cmd.Wait()
+    os.Exit(0)
+  }()
+
   if err := cmd.Start(); err != nil {
     if os.IsNotExist(err) {
       printErrorAndExit(path + " does not exist or is not executable", mimeBoundary)
@@ -150,13 +161,7 @@ func runConvert(mimeBoundary string, tempDir string) {
     close(doneWithStderr)
   }()
 
-  interrupt := make(chan os.Signal, 1)
-  signal.Notify(interrupt, os.Interrupt)
-
-  go func() {
-    <-interrupt
-    cmd.Process.Kill()
-  }()
+  close(started)
 
   scanner := bufio.NewScanner(stdout)
   for scanner.Scan() {
@@ -178,8 +183,6 @@ func runConvert(mimeBoundary string, tempDir string) {
       log.Fatalf("convert-single-file failed: %s", err)
     }
   }
-
-  close(interrupt)
 
   printFileAsFragment(tempDir, "0.json", mimeBoundary)
   printFileAsFragment(tempDir, "0.blob", mimeBoundary)

@@ -2,8 +2,3 @@
 Content-Type: multipart/form-data; name=progress
 
 {"children":{"nProcessed":1,"nTotal":5}}
---MIME-BOUNDARY
-Content-Type: multipart/form-data; name=error
-
-do-convert-single-file exited with status code -1
---MIME-BOUNDARY--

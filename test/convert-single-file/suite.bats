@@ -60,6 +60,6 @@ input_json() {
 }
 
 @test "output quickly on SIGINT" {
-	set_convert_script 'echo c1/5; kill -SIGINT $(grep PPid /proc/$$/status | cut -f2); sleep 1; echo bad-success > 0.json; echo bad-success > 0.blob'
+	set_convert_script 'echo c1/5; kill -SIGINT $(grep PPid /proc/$$/status | cut -f2); sleep 10; echo bad-success > 0.json; echo bad-success > 0.blob'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/cancel.mime -
 }
