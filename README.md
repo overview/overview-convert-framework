@@ -94,15 +94,15 @@ working directory. Your program must:
    `output-thumbnail.png` and/or `output.txt`.
 1. Exit with status code `0`. Any other exit code is an error in your code.
 
-## *TODO* `/app/convert-file-to-mime-multipart`
+## *TODO* `/app/convert-stream-to-mime-multipart`
 
 This version of `/app/convert` will:
 
-1. Write standard input to `input.blob` in a temporary directory and verify it's
-   the correct size
-1. Run `/app/do-convert-file-to-mime-multipart MIME-BOUNDARY JSON` (*your code*)
-   in the temporary directory
-1. Pipe your program's `stdout` to Overview
+1. Create an empty temporary directory
+1. Run `/app/do-convert-stream-to-mime-multipart MIME-BOUNDARY JSON` (*your
+   code*) within the temporary directory
+1. Stream the input file from Overview to your program's `stdin` and and pipe
+   your program's `stdout` to Overview
 
 Special cases:
 
@@ -112,55 +112,44 @@ Special cases:
   `error` event.
 * *TODO* Buggy code: emits an `error` event if your program does not produce a
   `error` or `done` event or end with `--MIME-BOUNDARY--`.
+* *TODO* Temporary files: if your program emits temporary files to its current
+  working directory, they will be deleted.
 
-**You must provide `/app/do-convert-file-to-mime-multipart`**. The framework
+**You must provide `/app/do-convert-stream-to-mime-multipart`**. The framework
 will invoke it with `MIME-BOUNDARY` and `JSON` as arguments. `MIME-BOUNDARY`
 will match the regex `[a-fA-F0-9]{1,60}`. Your program can read `input.blob`
 in the current directory.
 
-Your program may write files, but it doesn't need to. It must write valid
-`multipart/form-data` output to `stdout`. For instance:
+Your program must write valid `multipart/form-data` output to `stdout`. For
+instance:
 
 ```multipart/form-data
---RANDOM-MIME-BOUNDARY\r\n
+--MIME-BOUNDARY\r\n
 Content-Disposition: form-data; name="0.json"\r\n
 \r\n
 {JSON for first output file}\r\n
---RANDOM-MIME-BOUNDARY\r\n
+--MIME-BOUNDARY\r\n
 Content-Disposition: form-data; name="0.blob"\r\n
 \r\n
 Blob for first output file\r\n
---RANDOM-MIME-BOUNDARY\r\n
+--MIME-BOUNDARY\r\n
 Content-Disposition: form-data; name="progress"\r\n
 \r\n
 {"pages":{"nProcessed":1,"nTotal":3}}\r\n
---RANDOM-MIME-BOUNDARY\r\n
+--MIME-BOUNDARY\r\n
 Content-Disposition: form-data; name="done"\r\n
 \r\n
---RANDOM-MIME-BOUNDARY--
+--MIME-BOUNDARY--
 ```
 
 Rules:
 
-* Your output must end with a `done` or `error` element
+* Your output must end with a `done` or `error` element. A `done` element
+  should be empty; an `error` element must include an error message.
 * Your output must be in order: `0.json`, `0.blob`, (optionally `0.png`,
-  `0.jpg` and/or `0.txt`), `1.json`, `1.blob`, ...
-* You _should_ output an accurate progress report before each `N.json` to make
-  Overview's progressbar more accurate.
-
-## *TODO* `/app/convert-stream-to-mime-multipart`
-
-This version of `/app/convert` will:
-
-1. Run `/app/do-convert-stream-to-mime-multipart MIME-BOUNDARY JSON` (*your
-   code*)
-1. Stream the input file from Overview to your program's `stdin` and and pipe
-   your program's `stdout` to Overview
-
-Essentially, this is a stripped-down version of
-`/app/convert-file-to-mime-multipart`. It doesn't provide a temporary directory.
-It does handle `SIGINT`, verify the return value is `0`, and append an `error`
-event if your stream does not end with `--MIME-BOUNDARY--`.
+  `0.jpg` and/or `0.txt`), `1.json`, `1.blob`, ..., `done`.
+* You _should_ output an accurate progress report before each `N.json` to help
+  Overview's progressbar behave well.
 
 ## Roll your own
 
@@ -178,6 +167,34 @@ your own version of `/app/convert`. Beware, though:
   you can debug it easily.
 * Your own version of `/app/convert` should end quickly after receiving
   `SIGUSR`, because Overview will ignore all further output.
+* Your own version of `/app/convert` must ensure temporary files invoked during
+  one invocation aren't read by the next invocation: that would leak users'
+  documents to other users.
 
 `/app/convert-stream-to-mime-multipart` is small and fast, and it solves these
 problems for you. You probably want it.
+
+# To Maintain This Repository
+
+## Coding
+
+`./dev` will start a development loop that runs tests. Restart it if you edit
+`Dockerfile`.
+
+## Testing
+
+`docker build .` will run all tests.
+
+Tests are in `./test/*/suite.bats`. They're run in
+[bats](https://github.com/sstephenson/bats), an ideal framework for testing
+programs that pipe data around.
+
+## Releasing
+
+`./release MAJOR.MINOR.PATCH` will push to GitHub. Docker Hub will build the
+images for mass consumption.
+
+# License
+
+This software is Copyright 2011-2018 Jonathan Stray, and distributed under the
+terms of the GNU Affero General Public License. See the LICENSE file for details.
