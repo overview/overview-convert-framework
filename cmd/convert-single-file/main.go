@@ -138,21 +138,16 @@ func runConvert(mimeBoundary string, tempDir string) {
   }
 
   // Pipe stderr to self
+  doneWithStderr := make(chan interface{}, 1)
   go func() {
     if _, err := io.Copy(os.Stderr, stderr); err != nil {
-      log.Printf("io.Copy(os.Stderr, stderr) failed: %s", err)
+      if err == os.ErrClosed {
+        // There was no output, and we raced
+      } else {
+        log.Printf("io.Copy(os.Stderr, stderr) failed: %s", err)
+      }
     }
-  }()
-
-  doneWithStdout := make(chan interface{}, 1)
-
-  // Convert stdout while piping
-  go func() {
-    scanner := bufio.NewScanner(stdout)
-    for scanner.Scan() {
-      printLineAsFragment(scanner.Text(), mimeBoundary)
-    }
-    close(doneWithStdout)
+    close(doneWithStderr)
   }()
 
   interrupt := make(chan os.Signal, 1)
@@ -163,8 +158,13 @@ func runConvert(mimeBoundary string, tempDir string) {
     cmd.Process.Kill()
   }()
 
+  scanner := bufio.NewScanner(stdout)
+  for scanner.Scan() {
+    printLineAsFragment(scanner.Text(), mimeBoundary)
+  }
+
   err = cmd.Wait()
-  <-doneWithStdout
+  <-doneWithStderr
   if err != nil {
     if exiterr, ok := err.(*exec.ExitError); ok {
       // Buggy program exited with nonzero.
