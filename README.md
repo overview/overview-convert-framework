@@ -94,6 +94,48 @@ working directory. Your program must:
    `output-thumbnail.png` and/or `output.txt`.
 1. Exit with status code `0`. Any other exit code is an error in your code.
 
+### Testing: `/app/test-convert-single-file`
+
+You can test `/app/do-convert-single-file` by creating a Docker image with the
+special framework program, `/app/test-convert-single-file`. This is designed to
+integrate with automated build enviroments like Docker Hub.
+
+Your Docker build stage doesn't need a `CMD`. It should include:
+
+* `/app/test-convert-single-file` -- and you should
+  `RUN [ "/app/test-convert-single-file" ]`
+* `/app/do-convert-single-file` and everything it depends on --
+  `/app/test-convert-single-file` will invoke it once per test
+* `/app/test/test-*`: one directory per test, e.g. `/app/test/test-with-ocr`.
+  Each test directory should contain:
+    * `input.blob`
+    * `input.json` -- the JSON passed to `do-convert-single-file`
+    * `stdout` -- expected standard output from `do-convert-single-file`
+    * `0.blob` -- expected `0.blob` output
+    * `0.json` -- expected `0.json` output
+    * `0.txt` (optional) -- expected `0.txt` output
+    * `0-thumbnail.{png,jpg}` (optional) -- expected output
+
+`test-convert-single-file` will run `do-convert-single-file` in a separate
+directory per test. It will output in [TAP](https://testanything.org/) format
+and exit with status code `1` if any test fails.
+
+The test output is designed to help you correct your tests. For instance, here
+is example output from a test that fails because you did not write
+`0-thumbnail.jpg`
+
+    Step 12/13 : RUN [ "/app/test-convert-single-file" ]
+     ---> Running in f65521f3a30c
+    1..3
+    Tesseract Open Source OCR Engine v3.04.01 with Leptonica
+    not ok 1 - test-jpg-ocr
+        do-convert-single-file wrote /tmp/test-do-convert-single-file912093989/0-thumbnail.jpg, but we expected it not to exist
+    ...
+
+Upon seeing this error, you can
+`docker cp f65521f3a30c:/tmp/test-do-convert-single-file912093989/0-thumbnail.jpg .`
+to inspect the file in question (and perhaps make it the expected one).
+
 ## *TODO* `/app/convert-stream-to-mime-multipart`
 
 This version of `/app/convert` will:
