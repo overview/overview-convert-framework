@@ -12,6 +12,7 @@ import (
   "net/url"
   "os"
   "os/exec"
+  "strings"
   "syscall"
   "time"
 )
@@ -119,7 +120,19 @@ func tick(pollUrl string, retryTimeout time.Duration) {
             time.Sleep(retryTimeout)
             return
           }
+
+          log.Fatalf("Unhandled os.SyscallError: %v", scerr.Err)
+        } else if dnserr, ok := operr.Err.(*net.DNSError); ok && dnserr.IsTemporary {
+          log.Printf("%s; will try in %fs", dnserr.Error(), retryTimeout)
+          time.Sleep(retryTimeout)
+          return
+        } else if strings.HasSuffix(operr.Err.Error(), ": no such host") {
+          log.Printf("DNS lookup failed for %s: no such host; will try in %fs", pollUrl, retryTimeout)
+          time.Sleep(retryTimeout)
+          return
         }
+
+        log.Fatalf("Unhandled net.OpError: %v", operr.Err)
       }
     }
 

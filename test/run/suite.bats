@@ -60,6 +60,10 @@ run_tick() {
   run_tick
 }
 
+@test "succeed if DNS resolve fails" {
+  POLL_URL="http://nonexistent-hostname.test:8080/Task" "$cmd" just-one-tick
+}
+
 @test "succeed on 204 No Content" {
   run_tick
 }
