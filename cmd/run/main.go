@@ -169,7 +169,7 @@ func main() {
 
   rand.Seed(time.Now().UnixNano())
 
-  if os.Args[1] == "just-one-tick" {
+  if len(os.Args) > 0 && os.Args[1] == "just-one-tick" {
     tick(pollUrl, 0 * time.Second)
   } else {
     for {
