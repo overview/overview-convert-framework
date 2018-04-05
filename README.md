@@ -136,7 +136,7 @@ Upon seeing this error, you can
 `docker cp f65521f3a30c:/tmp/test-do-convert-single-file912093989/0-thumbnail.jpg .`
 to inspect the file in question (and perhaps make it the expected one).
 
-## *TODO* `/app/convert-stream-to-mime-multipart`
+## `/app/convert-stream-to-mime-multipart`
 
 This version of `/app/convert` will:
 
@@ -148,13 +148,13 @@ This version of `/app/convert` will:
 
 Special cases:
 
-* *TODO* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program
+* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program
   with `SIGKILL`.
-* *TODO* Error: if your program exits with non-zero return value, pipes an
+* Error: if your program exits with non-zero return value, pipes an
   `error` event.
-* *TODO* Buggy code: emits an `error` event if your program does not produce a
+* Buggy code: emits an `error` event if your program does not produce a
   `error` or `done` event or end with `--MIME-BOUNDARY--`.
-* *TODO* Temporary files: if your program emits temporary files to its current
+* Temporary files: if your program emits temporary files to its current
   working directory, they will be deleted.
 
 **You must provide `/app/do-convert-stream-to-mime-multipart`**. The framework

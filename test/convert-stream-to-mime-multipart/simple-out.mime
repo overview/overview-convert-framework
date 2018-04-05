@@ -1,0 +1,13 @@
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.json
+
+{"blob":{"nBytes":4}}
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.blob
+
+blob
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=done
+
+
+--MIME-BOUNDARY--

@@ -1,0 +1,13 @@
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.json
+
+{"blob":{"nBytes":4}}
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=0.blob
+
+blob
+--MIME-BOUNDARY
+Content-Type: multipart/form-data; name=error
+
+/app/do-convert-stream-to-mime-multipart exited with status code 127
+--MIME-BOUNDARY--
