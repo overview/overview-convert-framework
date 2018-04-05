@@ -129,16 +129,8 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
     log.Fatalf("Could not open stdout for read: %s", err)
   }
 
-  started := make(chan interface{}, 1)
   interrupt := make(chan os.Signal, 1)
   signal.Notify(interrupt, os.Interrupt)
-  go func() {
-    <-started
-    <-interrupt
-    cmd.Process.Kill()
-    cmd.Wait()
-    os.Exit(0)
-  }()
 
   if err := cmd.Start(); err != nil {
     if os.IsNotExist(err) {
@@ -148,7 +140,12 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
     }
   }
 
-  close(started)
+  go func() {
+    <-interrupt
+    cmd.Process.Signal(os.Interrupt)
+    cmd.Wait()
+    os.Exit(0)
+  }()
 
   scanner := bufio.NewScanner(stdout)
   for scanner.Scan() {

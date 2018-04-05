@@ -87,7 +87,7 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
 
   go func() {
     <-interrupt
-    cmd.Process.Kill()
+    cmd.Process.Signal(os.Interrupt)
     cmd.Wait()
     os.Exit(0)
   }()

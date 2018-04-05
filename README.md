@@ -76,8 +76,9 @@ This version of `/app/convert` will:
 
 Special cases:
 
-* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program with
-  `SIGKILL`.
+* Cancelation: if `/app/run` sends a `SIGINT` signal, sends your program
+  `SIGINT`. Your program should kill and wait for any child processes, then
+  exit. Its standard output and standard error will be ignored.
 * Error: if `/app/do-convert-single-file` exits with non-zero return value,
   pipes an `error` event.
 
@@ -148,8 +149,9 @@ This version of `/app/convert` will:
 
 Special cases:
 
-* Cancelation: if `/app/run` sends a `SIGINT` signal, kills your program
-  with `SIGKILL`.
+* Cancelation: if `/app/run` sends a `SIGINT` signal, sends your program
+  `SIGINT`. Your program should kill and wait for any child processes, then
+  exit. Its standard output and standard error will be ignored.
 * Error: if your program exits with non-zero return value, pipes an
   `error` event.
 * Buggy code: emits an `error` event if your program does not produce a
