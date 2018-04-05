@@ -112,16 +112,16 @@ func printFileAsFragmentIfExists(tempDir string, path string, mimeBoundary strin
   }
 }
 
-func runConvert(mimeBoundary string, tempDir string) {
+func runConvert(mimeBoundary string, inputJson string, tempDir string) {
   path := "/app/do-convert-single-file"
+  args := make([]string, 2)
+  args[0] = path
+  args[1] = inputJson
   cmd := exec.Cmd {
     Path: path,
+    Args: args,
     Dir: tempDir,
-  }
-
-  stderr, err := cmd.StderrPipe()
-  if err != nil {
-    log.Fatalf("Could not open stderr for read: %s", err)
+    Stderr: os.Stderr,
   }
 
   stdout, err := cmd.StdoutPipe()
@@ -148,19 +148,6 @@ func runConvert(mimeBoundary string, tempDir string) {
     }
   }
 
-  // Pipe stderr to self
-  doneWithStderr := make(chan interface{}, 1)
-  go func() {
-    if _, err := io.Copy(os.Stderr, stderr); err != nil {
-      if err == os.ErrClosed {
-        // There was no output, and we raced
-      } else {
-        log.Printf("io.Copy(os.Stderr, stderr) failed: %s", err)
-      }
-    }
-    close(doneWithStderr)
-  }()
-
   close(started)
 
   scanner := bufio.NewScanner(stdout)
@@ -168,9 +155,7 @@ func runConvert(mimeBoundary string, tempDir string) {
     printLineAsFragment(scanner.Text(), mimeBoundary)
   }
 
-  err = cmd.Wait()
-  <-doneWithStderr
-  if err != nil {
+  if err = cmd.Wait(); err != nil {
     if exiterr, ok := err.(*exec.ExitError); ok {
       // Buggy program exited with nonzero.
       if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
@@ -195,7 +180,7 @@ func runConvert(mimeBoundary string, tempDir string) {
 func doConvert(mimeBoundary string, inputJson string, tempDir string) {
   prepareTempDir(tempDir)
   writeInputBlob(inputJson, tempDir, mimeBoundary)
-  runConvert(mimeBoundary, tempDir)
+  runConvert(mimeBoundary, inputJson, tempDir)
 }
 
 func main() {
