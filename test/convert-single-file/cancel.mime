@@ -1,4 +1,4 @@
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=progress
+Content-Disposition: form-data; name=progress
 
 {"children":{"nProcessed":1,"nTotal":5}}

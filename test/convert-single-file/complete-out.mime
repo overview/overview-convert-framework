@@ -1,25 +1,25 @@
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.json
+Content-Disposition: form-data; name=0.json
 
 42
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.blob
+Content-Disposition: form-data; name=0.blob
 
 bar
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.jpg
+Content-Disposition: form-data; name=0-thumbnail.jpg
 
 jpg
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.png
+Content-Disposition: form-data; name=0-thumbnail.png
 
 png
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.txt
+Content-Disposition: form-data; name=0.txt
 
 txt
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=done
+Content-Disposition: form-data; name=done
 
 
 --MIME-BOUNDARY--

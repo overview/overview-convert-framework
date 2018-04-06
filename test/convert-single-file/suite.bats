@@ -23,13 +23,13 @@ input_json() {
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/simple-out.mime -
 }
 
-@test "output 0.png+0.jpg+0.txt" {
-	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0.png; echo -n jpg > 0.jpg'
+@test "output 0-thumbnail.png+0-thumbnail.jpg+0.txt" {
+	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0-thumbnail.png; echo -n jpg > 0-thumbnail.jpg'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/complete-out.mime -
 }
 
 @test "delete files between invocations" {
-	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0.png; echo -n jpg > 0.jpg'
+	set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob; echo -n txt > 0.txt; echo -n png > 0-thumbnail.png; echo -n jpg > 0-thumbnail.jpg'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) >/dev/null
   set_convert_script 'echo -n 42 > 0.json; echo -n bar > 0.blob'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/simple-out.mime -

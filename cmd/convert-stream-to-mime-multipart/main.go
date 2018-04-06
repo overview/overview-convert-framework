@@ -33,7 +33,7 @@ func printFragment(name string, contents string, mimeBoundary string) {
   // This may be called before any other message. We'll still write the initial
   // \r\n: it makes for an empty "preamble" in RFC2046, which is valid. And it
   // makes this file's logic easier.
-  outputOrCrash([]byte("\r\n--" + mimeBoundary + "\r\nContent-Type: multipart/form-data; name=" + name + "\r\n\r\n" + contents))
+  outputOrCrash([]byte("\r\n--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=" + name + "\r\n\r\n" + contents))
 }
 
 func printCloseDelimiter(mimeBoundary string) {
@@ -104,7 +104,7 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
 
   // DelimiterRegexp: finds done|error fragment or close-delimiter. (Those are
   // the only ones we care about.)
-  DelimiterRegexp := regexp.MustCompile("\\r\\n--" + mimeBoundary + "(--|\\r\\n[Cc][Oo][Nn][Tt][Ee][Nn][Tt]-[Tt][Yy][Pp][Ee]\\s*:\\s*multipart/form-data;\\s*name=(\"done\"|\"error\"|done|error)\\r\\n\\r\\n)")
+  DelimiterRegexp := regexp.MustCompile("\\r\\n--" + mimeBoundary + "(--|\\r\\n[Cc][Oo][Nn][Tt][Ee][Nn][Tt]-[Dd][Ii][Ss][Pp][Oo][Ss][Ii][Tt][Ii][Oo][Nn]\\s*:\\s*form-data;\\s*name=(\"done\"|\"error\"|done|error)\\r\\n\\r\\n)")
   BufferSize := 1024*1024               // how many bytes we read at a time
   MaxRemainderSize := 200               // max bytes cached between reads (to scan for a MIME boundary that spans reads)
   rawBuffer := make([]byte, BufferSize) // bytes from stdout.Read()
@@ -224,6 +224,8 @@ func doConvert(mimeBoundary string, inputJson string, tempDir string) {
 }
 
 func main() {
+  log.SetFlags(0)
+
   mimeBoundary := os.Args[1]
   inputJson := os.Args[2]
   tempDir := os.TempDir() + "/overview-convert-stream-to-mime-multipart"

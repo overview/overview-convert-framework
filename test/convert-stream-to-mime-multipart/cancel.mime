@@ -1,8 +1,8 @@
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.json
+Content-Disposition: form-data; name=0.json
 
 {"blob":{"nBytes":4}}
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=0.blob
+Content-Disposition: form-data; name=0.blob
 
 blob

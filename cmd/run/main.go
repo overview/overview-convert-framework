@@ -3,7 +3,6 @@ package main
 import (
   "bytes"
   "encoding/json"
-  "io"
   "io/ioutil"
   "log"
   "math/rand"
@@ -17,7 +16,7 @@ import (
   "time"
 )
 
-const retryTimeout = 10 * time.Second
+const retryTimeout = 3 * time.Second
 
 type Task struct {
   Url string `json:url`
@@ -38,6 +37,13 @@ func generateMimeBoundary() []byte {
 }
 
 func runConvert(task Task, jsonBytes []byte) {
+  blobResp, err := http.Get(task.Blob.Url)
+  if err != nil {
+    log.Printf("GET %s: %s", task.Blob.Url, err)
+    return
+  }
+  defer blobResp.Body.Close()
+
   mimeBoundary := string(generateMimeBoundary())
 
   path := "/app/convert"
@@ -48,16 +54,8 @@ func runConvert(task Task, jsonBytes []byte) {
   cmd := exec.Cmd {
     Path: path,
     Args: args,
-  }
-
-  stdin, err := cmd.StdinPipe()
-  if err != nil {
-    log.Fatalf("Could not open stdin from /app/convert: %s", err)
-  }
-
-  stderr, err := cmd.StderrPipe()
-  if err != nil {
-    log.Fatalf("Could not open stderr from /app/convert: %s", err)
+    Stdin: blobResp.Body,
+    Stderr: os.Stderr,
   }
 
   stdout, err := cmd.StdoutPipe()
@@ -69,38 +67,12 @@ func runConvert(task Task, jsonBytes []byte) {
     log.Fatalf("Could not invoke /app/convert: %s", err)
   }
 
-  // Pipe stderr to self
-  go func() {
-    if _, err := io.Copy(os.Stderr, stderr); err != nil {
-      log.Printf("io.Copy(os.Stderr, stderr) failed: %s", err)
-    }
-  }()
-
-  // Pipe job to stdin
-  go func() {
-    resp, err := http.Get(task.Blob.Url)
-    if err != nil {
-      if resp.StatusCode != 200 {
-        // TODO handle non-fatal errors: 404 -> return
-        log.Fatalf("Overview gave us a task but no blob: %s", task.Blob.Url)
-      }
-      log.Printf("GET %s: %s", task.Blob.Url, err)
-      stdin.Close()
-      return
-    }
-    defer resp.Body.Close()
-    if _, err := io.Copy(stdin, resp.Body); err != nil {
-      log.Printf("Failed to copy blob to stdin: %s")
-    }
-    stdin.Close()
-  }()
-
   // Pipe stdout to url
   resp, err := http.Post(task.Url, "multipart/form-data; boundary=\"" + mimeBoundary + "\"", stdout)
   if err != nil {
     log.Printf("POST piping /app/convert output failed: %s", err)
   }
-  // TODO assert HTTP 201 Created
+  // TODO assert HTTP 202 Accepted
   // TODO handle server going away
   resp.Body.Close()
 
@@ -161,6 +133,8 @@ func tick(pollUrl string, retryTimeout time.Duration) {
 }
 
 func main() {
+  log.SetFlags(0)
+
   pollUrl := os.Getenv("POLL_URL")
   if pollUrl == "" {
     panic("You must set POLL_URL before calling this program")

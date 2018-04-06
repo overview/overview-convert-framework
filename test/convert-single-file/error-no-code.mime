@@ -1,5 +1,5 @@
 --MIME-BOUNDARY
-Content-Type: multipart/form-data; name=error
+Content-Disposition: form-data; name=error
 
 /app/do-convert-single-file does not exist or is not executable
 --MIME-BOUNDARY--

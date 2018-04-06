@@ -58,7 +58,7 @@ func writeInputBlob(inputJson string, tempDir string, mimeBoundary string) {
 }
 
 func printFragment(name string, contents string, mimeBoundary string) {
-  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Type: multipart/form-data; name=" + name + "\r\n\r\n" + contents + "\r\n")); err != nil {
+  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=" + name + "\r\n\r\n" + contents + "\r\n")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
 }
@@ -76,16 +76,18 @@ func printLineAsFragment(line string, mimeBoundary string) {
 }
 
 func printErrorAndExit(message string, mimeBoundary string) {
-  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Type: multipart/form-data; name=error\r\n\r\n" + message + "\r\n--" + mimeBoundary + "--")); err != nil {
+  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=error\r\n\r\n" + message + "\r\n--" + mimeBoundary + "--")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
+  os.Stdout.Close()
   os.Exit(0)
 }
 
 func printDoneAndExit(mimeBoundary string) {
-  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Type: multipart/form-data; name=done\r\n\r\n\r\n--" + mimeBoundary + "--")); err != nil {
+  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=done\r\n\r\n\r\n--" + mimeBoundary + "--")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
+  os.Stdout.Close()
   os.Exit(0)
 }
 
@@ -95,7 +97,7 @@ func printFileAsFragment(tempDir string, path string, mimeBoundary string) {
     printErrorAndExit("do-convert-single-file did not output " + path, mimeBoundary)
   }
 
-  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Type: multipart/form-data; name=" + path + "\r\n\r\n")); err != nil {
+  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=" + path + "\r\n\r\n")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
   if _, err := io.Copy(os.Stdout, file); err != nil {
@@ -168,8 +170,8 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
 
   printFileAsFragment(tempDir, "0.json", mimeBoundary)
   printFileAsFragment(tempDir, "0.blob", mimeBoundary)
-  printFileAsFragmentIfExists(tempDir, "0.jpg", mimeBoundary)
-  printFileAsFragmentIfExists(tempDir, "0.png", mimeBoundary)
+  printFileAsFragmentIfExists(tempDir, "0-thumbnail.jpg", mimeBoundary)
+  printFileAsFragmentIfExists(tempDir, "0-thumbnail.png", mimeBoundary)
   printFileAsFragmentIfExists(tempDir, "0.txt", mimeBoundary)
   printDoneAndExit(mimeBoundary)
 }
@@ -181,6 +183,8 @@ func doConvert(mimeBoundary string, inputJson string, tempDir string) {
 }
 
 func main() {
+  log.SetFlags(0)
+
   mimeBoundary := os.Args[1]
   inputJson := os.Args[2]
   tempDir := os.TempDir() + "/overview-convert-single-file"
