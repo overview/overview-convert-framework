@@ -13,7 +13,7 @@ done
 echo "Handling: $first_line" >>/tmp/log
 
 if echo "$first_line" | grep -q 'POST /Task/'; then
-  echo -en 'HTTP/1.1 202 Accepted\r\n\r\n'
+  echo -en 'HTTP/1.1 201 Created\r\n\r\n'
   cat - > /tmp/run-test/posted-data
 elif echo "$first_line" | grep -q 'POST /Task'; then
   <&-

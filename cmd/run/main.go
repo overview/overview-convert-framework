@@ -100,7 +100,7 @@ func runConvert(task Task, jsonBytes []byte) {
   if err != nil {
     log.Printf("POST piping /app/convert output failed: %s", err)
   }
-  // TODO assert HTTP 202 Accepted
+  // TODO assert HTTP 201 Created
   // TODO handle server going away
   resp.Body.Close()
 
