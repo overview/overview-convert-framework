@@ -12,7 +12,10 @@ done
 
 echo "Handling: $first_line" >>/tmp/log
 
-if echo "$first_line" | grep -q 'GET /Task'; then
+if echo "$first_line" | grep -q 'POST /Task/'; then
+  echo -en 'HTTP/1.1 202 Accepted\r\n\r\n'
+  cat - > /tmp/run-test/posted-data
+elif echo "$first_line" | grep -q 'POST /Task'; then
   <&-
   if [ -f /tmp/run-test/task ]; then
     echo -en 'HTTP/1.1 200 OK\r\n\r\n'
@@ -20,9 +23,6 @@ if echo "$first_line" | grep -q 'GET /Task'; then
   else
     echo -en 'HTTP/1.1 204 No Content\r\n\r\n'
   fi
-elif echo "$first_line" | grep -q 'POST /Task'; then
-  echo -en 'HTTP/1.1 202 Accepted\r\n\r\n'
-  cat - > /tmp/run-test/posted-data
 elif echo "$first_line" | grep -q 'GET /blob'; then
   <&-
   if [ -f /tmp/run-test/blob ]; then

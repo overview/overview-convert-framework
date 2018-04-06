@@ -110,24 +110,24 @@ func runConvert(task Task, jsonBytes []byte) {
 }
 
 func tick(pollUrl string, retryTimeout time.Duration) {
-  resp, err := http.Get(pollUrl)
+  resp, err := http.Post(pollUrl, "text/plain", strings.NewReader(""))
   if err != nil {
     if uerr, ok := err.(*url.Error); ok {
       if operr, ok := uerr.Err.(*net.OpError); ok {
         if scerr, ok := operr.Err.(*os.SyscallError); ok {
           if scerr.Err == syscall.ECONNREFUSED {
-            log.Printf("Connection refused; will retry in %fs", retryTimeout)
+            log.Printf("Connection refused; will retry in %fs", retryTimeout.Seconds())
             time.Sleep(retryTimeout)
             return
           }
 
           log.Fatalf("Unhandled os.SyscallError: %v", scerr.Err)
         } else if dnserr, ok := operr.Err.(*net.DNSError); ok && dnserr.IsTemporary {
-          log.Printf("%s; will try in %fs", dnserr.Error(), retryTimeout)
+          log.Printf("%s; will try in %fs", dnserr.Error(), retryTimeout.Seconds())
           time.Sleep(retryTimeout)
           return
         } else if strings.HasSuffix(operr.Err.Error(), ": no such host") {
-          log.Printf("DNS lookup failed for %s: no such host; will try in %fs", pollUrl, retryTimeout)
+          log.Printf("DNS lookup failed for %s: no such host; will try in %fs", pollUrl, retryTimeout.Seconds())
           time.Sleep(retryTimeout)
           return
         }
@@ -140,7 +140,7 @@ func tick(pollUrl string, retryTimeout time.Duration) {
   }
   defer resp.Body.Close()
   if resp.StatusCode == 204 {
-    log.Printf("Overview has no tasks for us; will retry in %fs", retryTimeout)
+    log.Printf("Overview has no tasks for us; will retry in %fs", retryTimeout.Seconds())
     time.Sleep(retryTimeout)
     return
   } else if resp.StatusCode != 200 {
