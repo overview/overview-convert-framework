@@ -79,7 +79,6 @@ func printErrorAndExit(message string, mimeBoundary string) {
   if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=error\r\n\r\n" + message + "\r\n--" + mimeBoundary + "--")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
-  os.Stdout.Close()
   os.Exit(0)
 }
 
@@ -87,7 +86,6 @@ func printDoneAndExit(mimeBoundary string) {
   if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=done\r\n\r\n\r\n--" + mimeBoundary + "--")); err != nil {
     log.Fatalf("Error writing: %s", err)
   }
-  os.Stdout.Close()
   os.Exit(0)
 }
 
