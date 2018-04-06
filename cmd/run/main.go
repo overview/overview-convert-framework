@@ -140,10 +140,9 @@ func tick(pollUrl string, retryTimeout time.Duration) {
   }
   defer resp.Body.Close()
   if resp.StatusCode == 204 {
-    log.Printf("Overview has no tasks for us; will retry in %fs", retryTimeout.Seconds())
-    time.Sleep(retryTimeout)
+    log.Printf("Overview has no tasks for us; retrying...")
     return
-  } else if resp.StatusCode != 200 {
+  } else if resp.StatusCode != 201 {
     log.Fatalf("Overview responded with status %s", resp.Status)
   }
 
