@@ -31,7 +31,9 @@ var PathsToTest = [...]string{
   "0.txt",
 }
 
-var pdfDateRegex = regexp.MustCompile("  /(Creation|Mod)Date \\(D:\\d{14}")
+var pdfDateRegex = regexp.MustCompile("/(Creation|Mod)Date(\\s*)\\(D:\\d{14}")
+var pdfIdRegex = regexp.MustCompile("<[A-Z0-9]{32}>")
+var pdfChecksumRegex = regexp.MustCompile("/DocChecksum /[A-Z0-9]{32}")
 
 func prepareTempDir(tempDir string, exampleDir string) {
   inputPath := exampleDir + "/input.blob"
@@ -76,9 +78,19 @@ func runDoConvert(tempDir string, jsonString string) error {
   return cmd.Run()
 }
 
+func normalizePdf(b []byte) []byte {
+  noDates := pdfDateRegex.ReplaceAll(b, []byte("/$1Date$2(D:20000000000000"))
+  noIds := pdfIdRegex.ReplaceAll(noDates, []byte("<00000000000000000000000000000000>"))
+  noChecksum := pdfChecksumRegex.ReplaceAll(noIds, []byte("/DocChecksum /00000000000000000000000000000000"))
+  return noChecksum
+}
+
 func describeDiffBetweenPdfBytes(filename string, expectedBytes []byte, actualBytes []byte) string {
-  expectedBytesNorm := pdfDateRegex.ReplaceAll(expectedBytes, []byte("  /$1Date (D:20000000000000"))
-  actualBytesNorm := pdfDateRegex.ReplaceAll(actualBytes, []byte("  /$1Date (D:20000000000000"))
+  expectedBytesNorm := normalizePdf(expectedBytes)
+  actualBytesNorm := normalizePdf(actualBytes)
+
+  ioutil.WriteFile("/expected.pdf", expectedBytesNorm, 0644)
+  ioutil.WriteFile("/actual.pdf", actualBytesNorm, 0644)
 
   if bytes.Equal(expectedBytesNorm, actualBytesNorm) {
     return ""
