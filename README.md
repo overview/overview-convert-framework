@@ -19,6 +19,8 @@ FROM alpine:3.7 AS build
 ... (build your executables, including `do-convert-single-file`)
 
 FROM alpine:3.7 AS production
+# Add ca-certificates to let container download from S3 https:// URLs
+RUN apk add --update --no-cache ca-certificates
 WORKDIR /app
 # The framework provides the main executable
 COPY --from=framework /app/run /app/run
