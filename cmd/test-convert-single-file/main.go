@@ -32,8 +32,8 @@ var PathsToTest = [...]string{
 }
 
 var pdfDateRegex = regexp.MustCompile("/(Creation|Mod)Date(\\s*)\\(D:\\d{14}")
-var pdfIdRegex = regexp.MustCompile("<[A-Z0-9]{32}>")
-var pdfChecksumRegex = regexp.MustCompile("/DocChecksum /[A-Z0-9]{32}")
+var pdfIdRegex = regexp.MustCompile("<[a-zA-Z0-9]{32}>")
+var pdfChecksumRegex = regexp.MustCompile("/DocChecksum /[a-zA-Z0-9]{32}")
 
 func prepareTempDir(tempDir string, exampleDir string) {
   inputPath := exampleDir + "/input.blob"
