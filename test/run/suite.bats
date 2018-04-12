@@ -60,6 +60,15 @@ run_tick() {
   run_tick
 }
 
+@test "succeed if POST fails" {
+  set_convert 'cat - >/dev/null; echo -n OUTPUT'
+  set_task '{"url":"http://localhost:8080/TaskWithBrokenPost/id","blob":{"url":"http://localhost:8080/blob"}}'
+  set_blob 'Some blob'
+  run run_tick
+  [ "$status" -eq 0 ]
+  [ "${output##*:}" = ' connection reset by peer' ]
+}
+
 @test "succeed if DNS resolve fails" {
   POLL_URL="http://nonexistent-hostname.test:8080/Task" "$cmd" just-one-tick
 }

@@ -70,11 +70,12 @@ func runConvert(task Task, jsonBytes []byte) {
   // Pipe stdout to url
   resp, err := http.Post(task.Url, "multipart/form-data; boundary=\"" + mimeBoundary + "\"", stdout)
   if err != nil {
-    log.Printf("POST piping /app/convert output failed: %s", err)
+    // Server went away. That's fine ... we'll just return.
+    log.Printf("%s", err)
+  } else {
+    // TODO assert HTTP 202 Accepted
+    resp.Body.Close()
   }
-  // TODO assert HTTP 202 Accepted
-  // TODO handle server going away
-  resp.Body.Close()
 
   if err := cmd.Wait(); err != nil {
     log.Fatalf("/app/convert did not return with status code 0. That means it has a bug.")

@@ -15,6 +15,8 @@ echo "Handling: $first_line" >>/tmp/log
 if echo "$first_line" | grep -q 'POST /Task/'; then
   echo -en 'HTTP/1.1 202 Accepted\r\n\r\n'
   cat - > /tmp/run-test/posted-data
+elif echo "$first_line" | grep -q 'POST /TaskWithBrokenPost'; then
+  exit 1
 elif echo "$first_line" | grep -q 'POST /Task'; then
   <&-
   if [ -f /tmp/run-test/task ]; then

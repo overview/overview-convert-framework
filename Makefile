@@ -2,9 +2,9 @@
 .PHONY: all build bin/run
 
 test: build
+	test/run/suite.bats
 	test/convert-stream-to-mime-multipart/suite.bats
 	test/convert-single-file/suite.bats
-	test/run/suite.bats
 
 all: build
 
