@@ -20,6 +20,7 @@ const retryTimeout = 3 * time.Second
 
 type Task struct {
   Url string `json:url`
+  Filename string `json:filename`
   Blob struct {
     Url string `json:url`
   }
@@ -43,6 +44,8 @@ func runConvert(task Task, jsonBytes []byte) {
     return
   }
   defer blobResp.Body.Close()
+
+  log.Printf("converting %s", task.Filename)
 
   mimeBoundary := string(generateMimeBoundary())
 
