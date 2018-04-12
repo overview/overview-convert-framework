@@ -1,0 +1,9 @@
+--MIME-BOUNDARY
+Content-Disposition: form-data; name=heartbeat
+
+
+--MIME-BOUNDARY
+Content-Disposition: form-data; name=error
+
+foo
+--MIME-BOUNDARY--

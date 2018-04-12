@@ -12,11 +12,13 @@ import (
   "regexp"
   "strings"
   "syscall"
+  "time"
 )
 
 var pagesProgressRegex = regexp.MustCompile("^c(\\d+)/(\\d+)$")
 var bytesProgressRegex = regexp.MustCompile("^b(\\d+)/(\\d+)$")
 var fractionProgressRegex = regexp.MustCompile("^0(?:.\\d+)?$")
+const HeartbeatDelay = 1500 * time.Millisecond // how long to wait before sending heartbeat
 
 type Task struct {
   Blob struct {
@@ -75,6 +77,12 @@ func printLineAsFragment(line string, mimeBoundary string) {
   }
 }
 
+func printHeartbeatFragment(mimeBoundary string) {
+  if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=heartbeat\r\n\r\n\r\n")); err != nil {
+    log.Fatalf("Error writing: %s", err)
+  }
+}
+
 func printErrorAndExit(message string, mimeBoundary string) {
   if _, err := os.Stdout.Write([]byte("--" + mimeBoundary + "\r\nContent-Disposition: form-data; name=error\r\n\r\n" + message + "\r\n--" + mimeBoundary + "--")); err != nil {
     log.Fatalf("Error writing: %s", err)
@@ -109,6 +117,42 @@ func printFileAsFragment(tempDir string, path string, mimeBoundary string) {
 func printFileAsFragmentIfExists(tempDir string, path string, mimeBoundary string) {
   if _, err := os.Stat(tempDir + "/" + path); err == nil {
     printFileAsFragment(tempDir, path, mimeBoundary)
+  }
+}
+
+// returns once `convertStdout` has been consumed to EOF
+//
+// On a timeout, repeats the last message -- which we assume is a progress
+// message.
+func printProgressAndErrorOnStdout(convertStdout io.Reader, mimeBoundary string) {
+  lines := make(chan string, 1)
+
+  // Happy path: read from convertStdout, writing to `lines`
+  //
+  // We write them to a channel so we can select
+  go func() {
+    scanner := bufio.NewScanner(convertStdout)
+    for scanner.Scan() {
+      lines <- scanner.Text()
+    }
+    close(lines)
+  }()
+
+  // Now read from `lines` and write to stdout
+  for {
+    select {
+    case line, ok := <-lines:
+      if !ok {
+        // We're done!
+        return
+      }
+      printLineAsFragment(line, mimeBoundary)
+
+    // If a line takes too long, we don't want the HTTP connection to time
+    // out. Send a heartbeat.
+    case <-time.After(HeartbeatDelay):
+      printHeartbeatFragment(mimeBoundary)
+    }
   }
 }
 
@@ -147,10 +191,7 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
     os.Exit(0)
   }()
 
-  scanner := bufio.NewScanner(stdout)
-  for scanner.Scan() {
-    printLineAsFragment(scanner.Text(), mimeBoundary)
-  }
+  printProgressAndErrorOnStdout(stdout, mimeBoundary)
 
   if err = cmd.Wait(); err != nil {
     if exiterr, ok := err.(*exec.ExitError); ok {

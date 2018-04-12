@@ -59,6 +59,11 @@ input_json() {
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/progress-and-error.mime -
 }
 
+@test "output heartbeat when waiting too long" {
+  set_convert_script 'sleep 2; echo foo'
+  input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/heartbeat-and-error.mime -
+}
+
 @test "output quickly on SIGINT" {
 	set_convert_script 'do_job() { sleep 3; echo bad-success > 0.json; echo bad-success > 0.blob; }; trap "kill %1" INT; echo c1/5; do_job & kill -INT $(grep PPid /proc/$$/status | cut -f2); do_job & wait %1 || true'
 	input_blob | $cmd MIME-BOUNDARY $(input_json) | diff -u "$TEST_DIR"/cancel.mime -
