@@ -116,7 +116,10 @@ func tick(pollUrl string, retryTimeout time.Duration) {
   }
   defer resp.Body.Close()
   if resp.StatusCode == 204 {
-    log.Printf("Overview has no tasks for us; retrying...")
+    // This is normal: we long-poll, but only for a few seconds, and then
+    // Overview returns 204. Now we're expected to poll again -- that is,
+    // restart the loop.
+    //log.Printf("Overview has no tasks for us; retrying...")
     return
   } else if resp.StatusCode != 201 {
     log.Fatalf("Overview responded with status %s", resp.Status)
