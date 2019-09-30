@@ -133,7 +133,7 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
     // * remainderSize:len => bytes we haven't written to stdout
     usefulBuffer := rawBuffer[0:remainderSize + nBytes]
     for !wroteCloseDelimiter && len(usefulBuffer) > 0 {
-      match := DelimiterRegexp.FindSubmatch(usefulBuffer)
+      match := DelimiterRegexp.FindSubmatchIndex(usefulBuffer)
 
       if match == nil {
         // Write all to stdout, _including_ the remainder (which we'll re-scan
@@ -155,9 +155,9 @@ func runConvert(mimeBoundary string, inputJson string, tempDir string) {
 
         usefulBuffer = nil // break out of loop
       } else {
-        matchEndPos := cap(usefulBuffer) - cap(match[0]) + len(match[0])
+        matchEndPos := match[1]
 
-        if bytes.Equal([]byte("--"), match[1]) {
+        if bytes.Equal([]byte("--"), usefulBuffer[match[2]:match[3]]) {
           // We found a close-delimiter, which marks the end of (valid) output
           //
           // Output the delimiter and then ignore all further output.

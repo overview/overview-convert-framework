@@ -1,4 +1,4 @@
-FROM golang:1.10.0-alpine AS dev
+FROM golang:1.13.1-alpine AS dev
 
 RUN set -x \
       && apk add --update git make bats \
