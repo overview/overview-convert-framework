@@ -3,7 +3,6 @@ package main
 import (
   "bytes"
   "fmt"
-  "github.com/sergi/go-diff/diffmatchpatch"
   "image"
   "image/draw"
   "io"
@@ -16,6 +15,9 @@ import (
   "regexp"
   "strings"
   "unicode/utf8"
+
+  "github.com/google/go-cmp/cmp"
+  "github.com/google/go-cmp/cmp/cmpopts"
 
   _ "image/png"
   _ "image/jpeg"
@@ -78,24 +80,40 @@ func runDoConvert(tempDir string, jsonString string) error {
   return cmd.Run()
 }
 
-func normalizePdf(b []byte) []byte {
-  noDates := pdfDateRegex.ReplaceAll(b, []byte("/$1Date$2(D:20000000000000"))
-  noIds := pdfIdRegex.ReplaceAll(noDates, []byte("<00000000000000000000000000000000>"))
-  noChecksum := pdfChecksumRegex.ReplaceAll(noIds, []byte("/DocChecksum /00000000000000000000000000000000"))
-  return noChecksum
+func normalizePdf(path string) string {
+  // Always read a file from the same path with the same UNIX timestmaps.
+  // That should help keep it unique.
+  cmd := exec.Command("/usr/bin/qpdf", "--qdf", "--no-original-object-ids", "--deterministic-id", "--static-id", path, "-")
+  stdoutStderr, err := cmd.CombinedOutput()
+  if err != nil {
+    log.Panicf("QPDF failed, so we cannot compare PDFs. Install QPDF to fix this test suite.", err, string(stdoutStderr))
+  }
+  return string(stdoutStderr)
 }
 
-func describeDiffBetweenPdfBytes(filename string, expectedBytes []byte, actualBytes []byte) string {
-  expectedBytesNorm := normalizePdf(expectedBytes)
-  actualBytesNorm := normalizePdf(actualBytes)
+// describeDiffBetweenPdfFiles() displays differences between both passed
+// filenames in text format. Developers who understand the basics of PDF
+// layout can quickly see how the files differ.
+//
+// The current implementation is: convert to QDF format
+// (http://qpdf.sourceforge.net/files/qpdf-manual.html#ref.qdf), and compare
+// as text.
+func describeDiffBetweenPdfFiles(expectedPath string, actualPath string) string {
+  expectedNorm := normalizePdf(expectedPath)
+  actualNorm := normalizePdf(actualPath)
 
-  ioutil.WriteFile("/expected.pdf", expectedBytesNorm, 0644)
-  ioutil.WriteFile("/actual.pdf", actualBytesNorm, 0644)
-
-  if bytes.Equal(expectedBytesNorm, actualBytesNorm) {
-    return ""
+  // https://github.com/google/go-cmp/issues/192
+  diffText := cmp.Diff(
+    expectedNorm,
+    actualNorm,
+    cmpopts.AcyclicTransformer("multiline", func(s string) []string {
+      return strings.Split(s, "\n")
+    }),
+  )
+  if diffText != "" {
+    return fmt.Sprintf("do-convert-single-file output wrong PDF in %s. (The test may be broken: different PDFs may be equivalent.) QDF-mode diff:\n%s", actualPath, diffText)
   } else {
-    return fmt.Sprintf("do-convert-single-file output wrong PDF in %s. (The test may be broken: different PDFs may be equivalent.)", filename)
+    return ""
   }
 }
 
@@ -139,13 +157,11 @@ func describeDiffBetweenFiles(filename string, actualPath string, expectedPath s
     if expectedString == actualString {
       return ""
     } else {
-      dmp := diffmatchpatch.New()
-      diffs := dmp.DiffMain(expectedString, actualString, false)
-      diffText := dmp.DiffPrettyText(diffs)
+      diffText := cmp.Diff(expectedString, actualString)
       return fmt.Sprintf("do-convert-single-file output wrong text in %s. Diff follows:\n%s", actualPath, diffText)
     }
   } else if bytes.Equal([]byte("%PDF"), expectedBytes[0:4]) {
-    return describeDiffBetweenPdfBytes(actualPath, expectedBytes, actualBytes)
+    return describeDiffBetweenPdfFiles(expectedPath, actualPath)
   } else if expectedImage, expectedFormat, err := image.Decode(bytes.NewReader(expectedBytes)); err == nil {
     actualImage, actualFormat, err := image.Decode(bytes.NewReader(actualBytes))
     if err != nil {
@@ -213,6 +229,8 @@ func main() {
     if err != nil {
       log.Fatalf("Could not create temporary directory for test: %s", err)
     }
+    defer os.RemoveAll(tempDir)
+
     prepareTempDir(tempDir, testDir)
     testNumber := testIndex + 1
     testName := basename(testDir)

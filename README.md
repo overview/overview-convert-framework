@@ -123,6 +123,8 @@ Your Docker build stage doesn't need a `CMD`. It should include:
 directory per test. It will output in [TAP](https://testanything.org/) format
 and exit with status code `1` if any test fails.
 
+#### Copying failed-test files from the test suite
+
 The test output is designed to help you correct your tests. For instance, here
 is example output from a test that fails because you did not write
 `0-thumbnail.jpg`
@@ -138,6 +140,12 @@ is example output from a test that fails because you did not write
 Upon seeing this error, you can
 `docker cp f65521f3a30c:/tmp/test-do-convert-single-file912093989/0-thumbnail.jpg .`
 to inspect the file in question (and perhaps make it the expected one).
+
+#### Testing PDF conversion
+
+PDF output is a common case. We use QPDF for file comparison, to ease debugging.
+Your Dockerfile must install QPDF -- e.g., `apk --no-cache add qpdf` -- before
+running `RUN [ "/app/test-convert-single-file" ]` if you are testing PDF output.
 
 ## `/app/convert-stream-to-mime-multipart`
 
@@ -242,5 +250,6 @@ images for mass consumption.
 
 # License
 
-This software is Copyright 2011-2018 Jonathan Stray, and distributed under the
-terms of the GNU Affero General Public License. See the LICENSE file for details.
+This software is Copyright 2011-2018 Jonathan Stray and Copyright 2019-2020
+Overview Computing Inc., and distributed under the terms of the GNU Affero
+General Public License. See the LICENSE file for details.
