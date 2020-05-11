@@ -83,7 +83,7 @@ func runDoConvert(tempDir string, jsonString string) error {
 func normalizePdf(path string) string {
   // Always read a file from the same path with the same UNIX timestmaps.
   // That should help keep it unique.
-  cmd := exec.Command("/usr/bin/qpdf", "--qdf", "--no-original-object-ids", "--deterministic-id", "--static-id", path, "-")
+  cmd := exec.Command("/usr/bin/qpdf", "--qdf", "--deterministic-id", path, "-")
   stdoutStderr, err := cmd.CombinedOutput()
   if err != nil {
     log.Panicf("QPDF failed, so we cannot compare PDFs. Install QPDF to fix this test suite.", err, string(stdoutStderr))
