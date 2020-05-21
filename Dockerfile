@@ -1,7 +1,7 @@
 FROM golang:1.14.2-alpine AS dev
 
 RUN set -x \
-      && apk add --update git make bats \
+      && apk add --update git make bats lighttpd \
       && go get github.com/cespare/reflex
 
 WORKDIR /go/src/app
